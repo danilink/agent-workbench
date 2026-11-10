@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: workbench
+      POSTGRES_USER: workbench
+      POSTGRES_PASSWORD: workbench
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

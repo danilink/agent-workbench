@@ -1,0 +1,29 @@
+# sbt / Play
+backend/target/
+backend/project/target/
+backend/project/project/
+backend/project/metals.sbt
+backend/logs/
+backend/RUNNING_PID
+.bsp/
+.metals/
+.bloop/
+.vscode/
+
+# frontend
+frontend/node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# Claude Code: personal overrides stay local; shared settings are committed
+.claude/settings.local.json
+
+# secrets / local env
+.env
+.env.*
+!.env.example
+
+# misc
+.DS_Store
+*.log
+.idea/

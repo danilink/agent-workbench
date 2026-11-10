@@ -1,0 +1,18 @@
+# Agent Workbench JSON API. Parameterless actions have no parens (Scala 3).
+
+GET     /api/health               controllers.ApiController.health
+GET     /api/config               controllers.ApiController.config
+
+GET     /api/tasks                controllers.ApiController.listTasks
+POST    /api/tasks                controllers.ApiController.createTask
+GET     /api/tasks/:id            controllers.ApiController.getTask(id: String)
+
+GET     /api/runs/:id             controllers.ApiController.getRun(id: String)
+GET     /api/runs/:id/events      controllers.ApiController.runEvents(id: String, after: Option[Int])
+GET     /api/runs/:id/diff        controllers.ApiController.runDiff(id: String)
+POST    /api/runs/:id/cancel      controllers.ApiController.cancelRun(id: String)
+POST    /api/runs/:id/accept      controllers.ApiController.acceptRun(id: String)
+POST    /api/runs/:id/discard     controllers.ApiController.discardRun(id: String)
+
+# Server-Sent Events: every run update and agent event, for all runs.
+GET     /api/stream               controllers.ApiController.stream
