@@ -10,7 +10,9 @@ class StreamJsonParserSpec extends AnyWordSpec with Matchers:
 
     "read the init event" in {
       val line = """{"type":"system","subtype":"init","session_id":"abc","model":"claude-x","cwd":"/tmp/w"}"""
-      StreamJsonParser.parseLine(line) shouldBe Right(List(AgentEvent.Init("abc", Some("claude-x"), Some("/tmp/w"))))
+      StreamJsonParser.parseLine(line) shouldBe Right(
+        List(AgentEvent.Init("abc", Some("claude-x"), Some("/tmp/w")))
+      )
     }
 
     "split an assistant message into text and tool calls, skipping thinking" in {
@@ -29,19 +31,29 @@ class StreamJsonParserSpec extends AnyWordSpec with Matchers:
     }
 
     "accept tool results as a string or as text blocks" in {
-      val asString = """{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"ok"}]}}"""
+      val asString =
+        """{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"ok"}]}}"""
       val asBlocks =
         """{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t2","is_error":true,"content":[{"type":"text","text":"boom"}]}]}}"""
-      StreamJsonParser.parseLine(asString) shouldBe Right(List(AgentEvent.ToolResult("t1", isError = false, "ok")))
-      StreamJsonParser.parseLine(asBlocks) shouldBe Right(List(AgentEvent.ToolResult("t2", isError = true, "boom")))
+      StreamJsonParser.parseLine(asString) shouldBe Right(
+        List(AgentEvent.ToolResult("t1", isError = false, "ok"))
+      )
+      StreamJsonParser.parseLine(asBlocks) shouldBe Right(
+        List(AgentEvent.ToolResult("t2", isError = true, "boom"))
+      )
     }
 
     "truncate huge tool output" in {
-      val big  = "x" * (StreamJsonParser.PreviewLimit + 10)
+      val big = "x" * (StreamJsonParser.PreviewLimit + 10)
       val line = Json.stringify(
-        Json.obj("type" -> "user", "message" -> Json.obj("content" -> Json.arr(
-          Json.obj("type" -> "tool_result", "tool_use_id" -> "t", "content" -> big)
-        )))
+        Json.obj(
+          "type" -> "user",
+          "message" -> Json.obj(
+            "content" -> Json.arr(
+              Json.obj("type" -> "tool_result", "tool_use_id" -> "t", "content" -> big)
+            )
+          )
+        )
       )
       val Right(List(AgentEvent.ToolResult(_, _, preview))) = StreamJsonParser.parseLine(line): @unchecked
       preview should startWith("x" * StreamJsonParser.PreviewLimit)
@@ -52,19 +64,27 @@ class StreamJsonParserSpec extends AnyWordSpec with Matchers:
       val line =
         """{"type":"result","subtype":"success","is_error":false,"total_cost_usd":0.1234,"num_turns":7,"result":"Done","session_id":"abc"}"""
       StreamJsonParser.parseLine(line) shouldBe Right(
-        List(AgentEvent.Result(Some("abc"), isError = false, Some(BigDecimal("0.1234")), Some(7), Some("Done")))
+        List(
+          AgentEvent.Result(Some("abc"), isError = false, Some(BigDecimal("0.1234")), Some(7), Some("Done"))
+        )
       )
     }
 
     "treat an error result subtype without is_error as an error" in {
       val line = """{"type":"result","subtype":"error_max_turns","num_turns":40}"""
-      StreamJsonParser.parseLine(line).map(_.collect { case r: AgentEvent.Result => r.isError }) shouldBe Right(List(true))
+      StreamJsonParser
+        .parseLine(line)
+        .map(_.collect { case r: AgentEvent.Result => r.isError }) shouldBe Right(List(true))
     }
 
     "ignore blank lines and system noise, keep unknown types, reject non-JSON" in {
       StreamJsonParser.parseLine("   ") shouldBe Right(Nil)
-      StreamJsonParser.parseLine("""{"type":"system","subtype":"api_retry","attempt":1}""") shouldBe Right(Nil)
-      StreamJsonParser.parseLine("""{"type":"brand_new"}""") shouldBe Right(List(AgentEvent.Unknown(Json.obj("type" -> "brand_new"))))
+      StreamJsonParser.parseLine("""{"type":"system","subtype":"api_retry","attempt":1}""") shouldBe Right(
+        Nil
+      )
+      StreamJsonParser.parseLine("""{"type":"brand_new"}""") shouldBe Right(
+        List(AgentEvent.Unknown(Json.obj("type" -> "brand_new")))
+      )
       StreamJsonParser.parseLine("not json").isLeft shouldBe true
     }
   }

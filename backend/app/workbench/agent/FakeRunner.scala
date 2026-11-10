@@ -11,8 +11,8 @@ import play.api.libs.json.Json
 
 import workbench.config.AgentRunsExecutionContext
 
-/** Replays a plausible session and writes a real file, so the UI, worktrees and diffs can be exercised for free.
-  * Select it with `WORKBENCH_RUNNER=fake`.
+/** Replays a plausible session and writes a real file, so the UI, worktrees and diffs can be exercised for
+  * free. Select it with `WORKBENCH_RUNNER=fake`.
   */
 @Singleton
 final class FakeRunner @Inject() (ec: AgentRunsExecutionContext) extends AgentRunner:
@@ -35,7 +35,8 @@ final class FakeRunner @Inject() (ec: AgentRunsExecutionContext) extends AgentRu
         step(AgentEvent.ToolUse("t2", "Write", Json.obj("file_path" -> file)))
         Files.writeString(spec.workdir.resolve(file), s"# Notes\n\nPrompt was:\n\n> ${spec.prompt}\n", UTF_8)
         step(AgentEvent.ToolResult("t2", isError = false, s"Wrote $file"))
-        val result = AgentEvent.Result(
+        // `new` keeps the case type; the enum's apply widens to AgentEvent.
+        val result = new AgentEvent.Result(
           Some(s"fake-${spec.runId.value}"),
           isError = false,
           Some(BigDecimal("0.0000")),

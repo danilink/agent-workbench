@@ -6,8 +6,8 @@ import play.api.libs.json.*
 
 /** Parses one line of `claude -p --output-format stream-json --verbose` into zero or more [[AgentEvent]]s.
   *
-  * Pure and total: unknown shapes become [[AgentEvent.Unknown]] instead of failing, because the CLI adds event
-  * types over time and a run must never die on an event we don't understand yet.
+  * Pure and total: unknown shapes become [[AgentEvent.Unknown]] instead of failing, because the CLI adds
+  * event types over time and a run must never die on an event we don't understand yet.
   */
 object StreamJsonParser:
 
@@ -52,7 +52,7 @@ object StreamJsonParser:
         str(block, "text").filter(_.trim.nonEmpty).map(AgentEvent.Text(_)).toList
       case Some("tool_use") =>
         (for
-          id   <- str(block, "id")
+          id <- str(block, "id")
           name <- str(block, "name")
         yield AgentEvent.ToolUse(id, name, (block \ "input").asOpt[JsValue].getOrElse(JsNull))).toList
       case _ => Nil // thinking blocks etc.
@@ -83,4 +83,5 @@ object StreamJsonParser:
   private def str(js: JsValue, field: String): Option[String] = (js \ field).asOpt[String]
 
   private def truncate(s: String): String =
-    if s.length <= PreviewLimit then s else s.take(PreviewLimit) + s"… [${s.length - PreviewLimit} more chars]"
+    if s.length <= PreviewLimit then s
+    else s.take(PreviewLimit) + s"… [${s.length - PreviewLimit} more chars]"

@@ -42,10 +42,10 @@ final class ApiController @Inject() (
   def config: Action[AnyContent] = Action {
     Ok(
       Json.obj(
-        "repos"           -> cfg.repos.map(_.toString),
-        "runner"          -> cfg.runner,
+        "repos" -> cfg.repos.map(_.toString),
+        "runner" -> cfg.runner,
         "maxParallelRuns" -> cfg.maxParallelRuns,
-        "maxVariants"     -> MaxVariants
+        "maxVariants" -> MaxVariants
       )
     )
   }
@@ -60,12 +60,16 @@ final class ApiController @Inject() (
       case JsSuccess(body, _) =>
         Future {
           val variants = body.variants.getOrElse(1)
-          val baseRef  = body.baseRef.map(_.trim).filter(_.nonEmpty).getOrElse("HEAD")
+          val baseRef = body.baseRef.map(_.trim).filter(_.nonEmpty).getOrElse("HEAD")
           val created = for
             repoPath <- cfg.allowedRepo(body.repoPath).toRight(s"repo not allow-listed: ${body.repoPath}")
-            prompt   <- Some(body.prompt.trim).filter(_.nonEmpty).toRight("prompt is empty")
-            _        <- Either.cond(1 <= variants && variants <= MaxVariants, (), s"variants must be 1..$MaxVariants")
-            sha      <- git.resolveSha(repoPath, baseRef)
+            prompt <- Some(body.prompt.trim).filter(_.nonEmpty).toRight("prompt is empty")
+            _ <- Either.cond(
+              1 <= variants && variants <= MaxVariants,
+              (),
+              s"variants must be 1..$MaxVariants"
+            )
+            sha <- git.resolveSha(repoPath, baseRef)
           yield
             val task = Task(TaskId.random(), repoPath.toString, baseRef, sha, prompt, Instant.now())
             repo.insertTask(task)
@@ -94,25 +98,27 @@ final class ApiController @Inject() (
       case Some(runId) =>
         Future {
           val diff = for
-            run  <- repo.getRun(runId).toRight("run not found")
+            run <- repo.getRun(runId).toRight("run not found")
             task <- repo.getTask(run.taskId).toRight("task not found")
-            _    <- Either.cond(run.review == ReviewState.Pending, (), "worktree already removed")
-            d    <- git.diff(Paths.get(run.worktreePath), task.baseSha)
+            _ <- Either.cond(run.review == ReviewState.Pending, (), "worktree already removed")
+            d <- git.diff(Paths.get(run.worktreePath), task.baseSha)
           yield d
           diff.fold(e => NotFound(apiError(e)), d => Ok(d).as(ContentTypes.TEXT))
         }
   }
 
-  def cancelRun(id: String): Action[AnyContent]  = runCommand(id)(supervisor.cancel)
-  def acceptRun(id: String): Action[AnyContent]  = runCommand(id)(supervisor.accept)
+  def cancelRun(id: String): Action[AnyContent] = runCommand(id)(supervisor.cancel)
+  def acceptRun(id: String): Action[AnyContent] = runCommand(id)(supervisor.accept)
   def discardRun(id: String): Action[AnyContent] = runCommand(id)(supervisor.discard)
 
   /** One SSE stream for everything; the UI filters client-side. `event:` is the message type. */
   def stream: Action[AnyContent] = Action {
     val events: Source[EventSource.Event, ?] = bus.subscribe
       .map {
-        case BusMessage.RunUpdated(run)       => EventSource.Event(Json.stringify(Json.toJson(run)), None, Some("run"))
-        case BusMessage.EventAppended(event) => EventSource.Event(Json.stringify(Json.toJson(event)), None, Some("run-event"))
+        case BusMessage.RunUpdated(run) =>
+          EventSource.Event(Json.stringify(Json.toJson(run)), None, Some("run"))
+        case BusMessage.EventAppended(event) =>
+          EventSource.Event(Json.stringify(Json.toJson(event)), None, Some("run-event"))
       }
       .keepAlive(15.seconds, () => EventSource.Event("{}", None, Some("ping")))
     Ok.chunked(events).as(ContentTypes.EVENT_STREAM)

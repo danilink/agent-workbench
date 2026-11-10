@@ -46,7 +46,8 @@ final case class Run(
 enum EventKind derives CanEqual:
   case Init, Text, ToolUse, ToolResult, Result, Log, Unknown
 
-/** Persisted, ordered record of what an agent did. `payload` is the normalised event, not the raw CLI line. */
+/** Persisted, ordered record of what an agent did. `payload` is the normalised event, not the raw CLI line.
+  */
 final case class RunEvent(runId: RunId, seq: Int, kind: EventKind, payload: JsValue, at: Instant)
 
 final case class TaskDetail(task: Task, runs: Seq[Run])

@@ -17,8 +17,9 @@ import workbench.config.{AgentRunsExecutionContext, WorkbenchConfig}
 
 /** Drives `claude -p` headless and turns its stream-json stdout into [[AgentEvent]]s.
   *
-  * Threads per run: one reads stdout (and owns `emit`), one drains stderr into a buffer that is emitted from the
-  * stdout thread once the process exits, so `emit` stays single-threaded as the [[AgentRunner]] contract says.
+  * Threads per run: one reads stdout (and owns `emit`), one drains stderr into a buffer that is emitted from
+  * the stdout thread once the process exits, so `emit` stays single-threaded as the [[AgentRunner]] contract
+  * says.
   */
 @Singleton
 final class ClaudeCliRunner @Inject() (cfg: WorkbenchConfig, ec: AgentRunsExecutionContext)
@@ -46,9 +47,9 @@ final class ClaudeCliRunner @Inject() (cfg: WorkbenchConfig, ec: AgentRunsExecut
       ++ c.extraArgs
 
   def start(spec: RunSpec, emit: AgentEvent => Unit): RunHandle =
-    val cmd       = command(spec)
+    val cmd = command(spec)
     logger.info(s"run ${spec.runId}: starting ${cmd.head} in ${spec.workdir}")
-    val process   = new ProcessBuilder(cmd*).directory(spec.workdir.toFile).start()
+    val process = new ProcessBuilder(cmd*).directory(spec.workdir.toFile).start()
     process.getOutputStream.close() // otherwise `claude -p` may wait on stdin
     val cancelled = AtomicBoolean(false)
     val stderrBuf = new StringBuilder
@@ -82,7 +83,8 @@ final class ClaudeCliRunner @Inject() (cfg: WorkbenchConfig, ec: AgentRunsExecut
         val result = last match
           case Some(r) => RunOutcome(r.sessionId, r.isError || code != 0, r.costUsd, r.numTurns, r.summary)
           case None =>
-            val why = if cancelled.get then "cancelled" else s"claude exited with code $code and no result event"
+            val why =
+              if cancelled.get then "cancelled" else s"claude exited with code $code and no result event"
             RunOutcome(None, isError = true, None, None, Some(why))
         outcome.success(result)
       catch

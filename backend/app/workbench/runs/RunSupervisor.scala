@@ -22,8 +22,9 @@ import workbench.store.WorkbenchRepo
 
 /** Owns the lifecycle of every run: queue → worktree → agent session → result → review.
   *
-  * Concurrency is bounded by a semaphore of `max-parallel-runs`; a run waiting for a slot is visibly `Queued`.
-  * Each run is driven by exactly one thread, which is the only writer of its row and its event sequence.
+  * Concurrency is bounded by a semaphore of `max-parallel-runs`; a run waiting for a slot is visibly
+  * `Queued`. Each run is driven by exactly one thread, which is the only writer of its row and its event
+  * sequence.
   */
 @Singleton
 final class RunSupervisor @Inject() (
@@ -37,8 +38,8 @@ final class RunSupervisor @Inject() (
 
   private given AgentRunsExecutionContext = ec
 
-  private val slots   = Semaphore(cfg.maxParallelRuns, true)
-  private val live    = TrieMap.empty[RunId, RunHandle]
+  private val slots = Semaphore(cfg.maxParallelRuns, true)
+  private val live = TrieMap.empty[RunId, RunHandle]
   private val cancels = TrieMap.empty[RunId, Unit]
 
   locally {
@@ -89,11 +90,11 @@ final class RunSupervisor @Inject() (
 
   private def review(id: RunId, to: ReviewState, deleteBranch: Boolean): Either[String, Run] =
     for
-      run  <- repo.getRun(id).toRight("run not found")
-      _    <- Either.cond(run.status.isTerminal, (), s"run is still ${run.status}")
-      _    <- Either.cond(run.review == ReviewState.Pending, (), s"run was already ${run.review}")
+      run <- repo.getRun(id).toRight("run not found")
+      _ <- Either.cond(run.status.isTerminal, (), s"run is still ${run.status}")
+      _ <- Either.cond(run.review == ReviewState.Pending, (), s"run was already ${run.review}")
       task <- repo.getTask(run.taskId).toRight("task not found")
-      _    <- git.remove(Paths.get(task.repoPath), Paths.get(run.worktreePath), run.branch, deleteBranch)
+      _ <- git.remove(Paths.get(task.repoPath), Paths.get(run.worktreePath), run.branch, deleteBranch)
     yield save(run.copy(review = to))
 
   // --- execution (runs on the agent-runs dispatcher) --------------------------
@@ -102,7 +103,8 @@ final class RunSupervisor @Inject() (
     slots.acquire()
     var run = initial
     try
-      if cancels.contains(run.id) then run = save(run.copy(status = RunStatus.Cancelled, finishedAt = Some(Instant.now())))
+      if cancels.contains(run.id) then
+        run = save(run.copy(status = RunStatus.Cancelled, finishedAt = Some(Instant.now())))
       else
         run = save(run.copy(status = RunStatus.Preparing, startedAt = Some(Instant.now())))
         val workdir = Paths.get(run.worktreePath)
@@ -119,8 +121,8 @@ final class RunSupervisor @Inject() (
       slots.release()
 
   private def drive(task: Task, start: Run, workdir: Path): Run =
-    val run    = save(start.copy(status = RunStatus.Running))
-    val seq    = AtomicInteger(0)
+    val run = save(start.copy(status = RunStatus.Running))
+    val seq = AtomicInteger(0)
     val handle = runner.start(RunSpec(run.id, workdir, task.prompt), e => record(run.id, seq, e))
     live.put(run.id, handle)
     if cancels.contains(run.id) then handle.cancel() // cancel raced with start
@@ -144,7 +146,7 @@ final class RunSupervisor @Inject() (
 
   private def record(id: RunId, seq: AtomicInteger, e: AgentEvent): Unit =
     val (kind, payload) = AgentEvent.toRecord(e)
-    val event           = RunEvent(id, seq.incrementAndGet(), kind, payload, Instant.now())
+    val event = RunEvent(id, seq.incrementAndGet(), kind, payload, Instant.now())
     repo.appendEvent(event)
     bus.publish(BusMessage.EventAppended(event))
 

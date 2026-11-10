@@ -35,10 +35,10 @@ object AgentEvent:
     case Result(sessionId, isError, cost, turns, summary) =>
       EventKind.Result -> Json.obj(
         "sessionId" -> sessionId,
-        "isError"   -> isError,
-        "costUsd"   -> cost,
-        "numTurns"  -> turns,
-        "summary"   -> summary
+        "isError" -> isError,
+        "costUsd" -> cost,
+        "numTurns" -> turns,
+        "summary" -> summary
       )
     case Log(stream, line) =>
       EventKind.Log -> Json.obj("stream" -> stream, "line" -> line)

@@ -14,8 +14,9 @@ enum BusMessage:
 
 /** In-process fan-out of run updates to every SSE subscriber.
   *
-  * Single-node by design (see docs/adr/0003). Clients never rely on the bus for completeness: they load history
-  * over REST and use the stream only for what happens next, so a dropped message costs freshness, not data.
+  * Single-node by design (see docs/adr/0003). Clients never rely on the bus for completeness: they load
+  * history over REST and use the stream only for what happens next, so a dropped message costs freshness, not
+  * data.
   */
 @Singleton
 final class EventBus @Inject() (mat: Materializer):

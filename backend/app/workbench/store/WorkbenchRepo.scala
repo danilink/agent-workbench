@@ -13,10 +13,11 @@ import play.api.libs.json.Json
 
 import workbench.domain.*
 
-/** Plain JDBC on purpose: four tables don't justify an ORM, and the SQL stays greppable for agents and humans.
+/** Plain JDBC on purpose: four tables don't justify an ORM, and the SQL stays greppable for agents and
+  * humans.
   *
-  * Every method BLOCKS. Call it from [[workbench.config.DatabaseExecutionContext]] or from an agent-run thread,
-  * never from Play's default dispatcher.
+  * Every method BLOCKS. Call it from [[workbench.config.DatabaseExecutionContext]] or from an agent-run
+  * thread, never from Play's default dispatcher.
   */
 @Singleton
 final class WorkbenchRepo @Inject() (db: Database):
@@ -24,14 +25,16 @@ final class WorkbenchRepo @Inject() (db: Database):
   // --- tasks ------------------------------------------------------------------
 
   def insertTask(t: Task): Unit = db.withConnection { c =>
-    update(c, "INSERT INTO tasks (id, repo_path, base_ref, base_sha, prompt, created_at) VALUES (?,?,?,?,?,?)") {
-      ps =>
-        ps.setObject(1, t.id.value)
-        ps.setString(2, t.repoPath)
-        ps.setString(3, t.baseRef)
-        ps.setString(4, t.baseSha)
-        ps.setString(5, t.prompt)
-        ps.setTimestamp(6, Timestamp.from(t.createdAt))
+    update(
+      c,
+      "INSERT INTO tasks (id, repo_path, base_ref, base_sha, prompt, created_at) VALUES (?,?,?,?,?,?)"
+    ) { ps =>
+      ps.setObject(1, t.id.value)
+      ps.setString(2, t.repoPath)
+      ps.setString(3, t.baseRef)
+      ps.setString(4, t.baseSha)
+      ps.setString(5, t.prompt)
+      ps.setTimestamp(6, Timestamp.from(t.createdAt))
     }
   }
 
@@ -62,7 +65,9 @@ final class WorkbenchRepo @Inject() (db: Database):
     }
   }
 
-  /** Writes every mutable column. Runs have a single writer (their supervisor thread), so last-write-wins is fine. */
+  /** Writes every mutable column. Runs have a single writer (their supervisor thread), so last-write-wins is
+    * fine.
+    */
   def updateRun(r: Run): Unit = db.withConnection { c =>
     update(
       c,
@@ -163,7 +168,9 @@ final class WorkbenchRepo @Inject() (db: Database):
       ps.executeUpdate()
     }
 
-  private def query[A](c: Connection, sql: String)(bind: PreparedStatement => Unit)(row: ResultSet => A): Seq[A] =
+  private def query[A](c: Connection, sql: String)(bind: PreparedStatement => Unit)(
+      row: ResultSet => A
+  ): Seq[A] =
     Using.resource(c.prepareStatement(sql)) { ps =>
       bind(ps)
       Using.resource(ps.executeQuery()) { rs =>
@@ -173,7 +180,9 @@ final class WorkbenchRepo @Inject() (db: Database):
       }
     }
 
-  private def setOpt[A](ps: PreparedStatement, i: Int, v: Option[A], sqlType: Int)(set: (Int, A) => Unit): Unit =
+  private def setOpt[A](ps: PreparedStatement, i: Int, v: Option[A], sqlType: Int)(
+      set: (Int, A) => Unit
+  ): Unit =
     v match
       case Some(a) => set(i, a)
       case None    => ps.setNull(i, sqlType)

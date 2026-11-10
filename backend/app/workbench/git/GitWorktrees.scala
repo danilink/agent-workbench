@@ -28,7 +28,8 @@ final class GitWorktrees:
   /** Removes the checkout. The branch is kept unless `deleteBranch`, so accepted work can be merged later. */
   def remove(repo: Path, worktree: Path, branch: String, deleteBranch: Boolean): Either[String, Unit] =
     val removed =
-      if Files.exists(worktree) then git(repo, "worktree", "remove", "--force", worktree.toString).map(_ => ())
+      if Files.exists(worktree) then
+        git(repo, "worktree", "remove", "--force", worktree.toString).map(_ => ())
       else git(repo, "worktree", "prune").map(_ => ())
     removed.flatMap(_ => if deleteBranch then git(repo, "branch", "-D", branch).map(_ => ()) else Right(()))
 
