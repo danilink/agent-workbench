@@ -6,7 +6,10 @@ import type { RunEvent } from '../api/types'
 /** Renders the normalised agent events. Tool results are folded under their tool call. */
 export function Timeline({ events }: { events: RunEvent[] }) {
   const bottom = useRef<HTMLDivElement>(null)
-  useEffect(() => bottom.current?.scrollIntoView({ block: 'nearest' }), [events.length])
+  // Braces matter: newer Chrome returns a Promise from scrollIntoView, and React would call it as the cleanup.
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ block: 'nearest' })
+  }, [events.length])
 
   const results = new Map<string, Extract<RunEvent, { kind: 'ToolResult' }>>()
   for (const e of events) if (e.kind === 'ToolResult') results.set(e.payload.toolUseId, e)
