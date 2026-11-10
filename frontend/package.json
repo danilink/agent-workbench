@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "typecheck": "tsc -b",
-    "preview": "vite preview"
+    "typecheck": "tsc -b && tsc -p tsconfig.node.json",
+    "preview": "vite preview",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@chakra-ui/react": "2.10.10",
@@ -21,6 +22,8 @@
     "xstate": "5.33.3"
   },
   "devDependencies": {
+    "@playwright/test": "1.65.0",
+    "@types/node": "20.19.43",
     "@types/react": "18.3.31",
     "@types/react-dom": "18.3.7",
     "@vitejs/plugin-react": "4.7.0",

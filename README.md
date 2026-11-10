@@ -1,5 +1,7 @@
 # Agent Workbench
 
+[![CI](https://github.com/danilink/agent-workbench/actions/workflows/ci.yml/badge.svg)](https://github.com/danilink/agent-workbench/actions/workflows/ci.yml)
+
 Dispatch one coding task to several Claude Code sessions in parallel, watch them work live, compare their diffs, and keep the best one.
 
 Each attempt runs headless (`claude -p --output-format stream-json`) in its **own git worktree and branch**, so agents never step on each other and every result is an ordinary branch you can review, merge or throw away.
@@ -67,7 +69,7 @@ This project is built mostly by agents, steered by me, and the repo is shaped fo
 
 ## Roadmap
 
-See [docs/PLAN.md](docs/PLAN.md). Next up: Redis pub/sub so the event bus works across nodes, an "ask the agents to review each other" step, Storybook for the run timeline, Docker image + CircleCI.
+See [docs/PLAN.md](docs/PLAN.md). Next up: Redis pub/sub so the event bus works across nodes, an "ask the agents to review each other" step, Storybook for the run timeline, Docker image.
 
 ## License
 

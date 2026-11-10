@@ -10,7 +10,7 @@ Two weeks, shaped as a small "cycle": fixed time, variable scope. Each milestone
 - [x] Bounded parallelism, cancellation (SIGINT then kill), orphan recovery on boot
 - [x] SSE stream; React UI with live timeline, diff, accept/discard (XState)
 - [x] `CLAUDE.md`, skills, hook, reviewer subagent, ADRs
-- [ ] First green `sbt compile test` on a real machine
+- [x] First green `sbt compile test` on a real machine
 - [ ] Dogfood: use the workbench to build M2
 
 ## M2 — Comparing attempts (days 5–8)
@@ -25,7 +25,9 @@ Two weeks, shaped as a small "cycle": fixed time, variable scope. Each milestone
 
 - [ ] Redis pub/sub behind `EventBus` so several Play nodes can serve SSE (ADR 0003)
 - [ ] Integration tests with Testcontainers Postgres
-- [ ] Dockerfile, `docker compose` for the full stack, CircleCI pipeline
+- [x] CI (GitHub Actions): format, compile, test, typecheck, build, Playwright smoke test on the fake runner
+- [x] React error boundary, so a render bug shows an error instead of a blank page
+- [ ] Dockerfile, `docker compose` for the full stack
 - [ ] Cost guardrails: per-task budget, daily cap
 
 ## M4 — Show it (days 13–14)

@@ -13,6 +13,7 @@ Monorepo: `backend/` (Scala 3.3 LTS, Play 3.0, plain JDBC, Postgres) and `fronte
 | Run backend (no tokens) | `cd backend && WORKBENCH_RUNNER=fake WORKBENCH_REPOS=$PWD/.. sbt run` |
 | Frontend typecheck | `cd frontend && npm run typecheck` |
 | Frontend build | `cd frontend && npm run build` |
+| E2E smoke test (fake runner; reuses running servers or starts them) | `cd frontend && npm run e2e` |
 
 Prefer `sbt -client` (reuses a running sbt server) over plain `sbt`; cold starts are slow.
 
@@ -44,6 +45,6 @@ Prefer `sbt -client` (reuses a running sbt server) over plain `sbt`; cold starts
 ## Before you say you're done
 
 1. Backend touched → `sbt -client compile test` passes.
-2. Frontend touched → `npm run typecheck` passes (the hook runs it after each edit too).
+2. Frontend touched → `npm run typecheck` passes (the hook runs it after each edit too). UI flow touched → `npm run e2e` passes.
 3. Contract touched → both sides updated.
 4. Architectural decision made → add an ADR in `docs/adr/`.

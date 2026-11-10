@@ -45,8 +45,9 @@ function applyRun(qc: QueryClient, run: Run) {
   )
   // A finished run's diff is final now; make sure we don't show a mid-run snapshot. Refetching events
   // also closes the small gap where an event lands between the initial fetch and the cache existing.
+  // Once reviewed, the worktree is gone and asking for its diff would 404.
   if (TERMINAL.has(run.status)) {
-    void qc.invalidateQueries({ queryKey: keys.diff(run.id) })
+    if (run.review === 'Pending') void qc.invalidateQueries({ queryKey: keys.diff(run.id) })
     void qc.invalidateQueries({ queryKey: keys.events(run.id) })
   }
 }
