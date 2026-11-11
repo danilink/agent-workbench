@@ -20,8 +20,9 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      // Locally, use the installed Chrome instead of downloading Playwright's build.
-      use: { ...devices['Desktop Chrome'], ...(CI ? {} : { channel: 'chrome' }) },
+      // The installed Chrome, locally and in CI (GitHub runners ship it): no browser download and no apt step,
+      // which failed whenever the runner could not reach the Ubuntu mirrors.
+      use: { ...devices['Desktop Chrome'], channel: 'chrome' },
     },
   ],
   webServer: [
