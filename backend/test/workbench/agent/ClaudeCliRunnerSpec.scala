@@ -15,7 +15,7 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-import workbench.config.{AgentRunsExecutionContext, ClaudeConfig, WorkbenchConfig}
+import workbench.config.{AgentRunsExecutionContext, CheckConfig, ClaudeConfig, WorkbenchConfig}
 import workbench.domain.RunId
 
 /** Drives the real runner against a shell script standing in for `claude`, on a dispatcher configured like
@@ -51,7 +51,16 @@ class ClaudeCliRunnerSpec extends AnyWordSpec with Matchers with BeforeAndAfterA
 
   private def runner(binary: Path) =
     val claude = ClaudeConfig(binary.toString, "acceptEdits", Nil, 5, 1.0, Nil)
-    val cfg = WorkbenchConfig(Nil, Paths.get("/tmp"), 1, 1.minute, cancelGrace = 1.second, "claude", claude)
+    val cfg = WorkbenchConfig(
+      Nil,
+      Paths.get("/tmp"),
+      1,
+      1.minute,
+      cancelGrace = 1.second,
+      "claude",
+      claude,
+      CheckConfig(Nil, 1.minute)
+    )
     ClaudeCliRunner(cfg, ec)
 
   /** Starts the fake, waits for its Init event, cancels it. Returns ms from cancel to outcome, and the

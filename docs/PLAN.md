@@ -11,11 +11,11 @@ Two weeks, shaped as a small "cycle": fixed time, variable scope. Each milestone
 - [x] SSE stream; React UI with live timeline, diff, accept/discard (XState)
 - [x] `CLAUDE.md`, skills, hook, reviewer subagent, ADRs
 - [x] First green `sbt compile test` on a real machine
-- [ ] Dogfood: use the workbench to build M2
+- [x] Dogfood: use the workbench to build M2 (first real run wrote most of the checks feature)
 
 ## M2 — Comparing attempts (days 5–8)
 
-- [ ] Run checks per attempt in its worktree (configurable command, e.g. `sbt test`) and show pass/fail
+- [x] Run checks per attempt in its worktree (configurable command, e.g. `sbt test`) and show pass/fail
 - [ ] Side-by-side comparison: files touched, lines changed, cost, turns, checks
 - [ ] "Judge" step: one more session reads all diffs and recommends one, with reasons
 - [ ] Follow-up prompt on a run (`--resume <session_id>`) instead of starting over

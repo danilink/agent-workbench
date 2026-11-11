@@ -25,7 +25,13 @@ export function RunPanel({ run }: { run: Run }) {
             Cancel
           </Button>
         )}
-        {finished && run.review === 'Pending' && <ReviewBar runId={run.id} />}
+        {finished && run.review === 'Pending' && run.checkStatus === 'Running' && (
+          // The check runs inside the worktree that Accept or Discard would remove; the server refuses too.
+          <Text fontSize="xs" color="gray.500">
+            Review once the check finishes
+          </Text>
+        )}
+        {finished && run.review === 'Pending' && run.checkStatus !== 'Running' && <ReviewBar runId={run.id} />}
       </HStack>
       {run.error && (
         <Text fontSize="sm" color="red.400" mb={2}>

@@ -27,11 +27,11 @@ final class CheckRunner @Inject() (cfg: WorkbenchConfig) extends Logging:
   /** Blocks for at most `workbench.check.timeout`. Never throws: a check that cannot even start is a failed
     * check, not a failed run.
     */
-  def run(workdir: Path): CheckResult =
+  def run(workdir: Path, onStart: Process => Unit = _ => ()): CheckResult =
     val cmd = cfg.check.command
     val line = cmd.mkString(" ")
     try
-      val out = Proc.run(cmd, workdir, cfg.check.timeout)
+      val out = Proc.run(cmd, workdir, cfg.check.timeout, onStart)
       val body = Seq(out.stdout, out.stderr).map(_.trim).filter(_.nonEmpty).mkString("\n")
       logger.info(s"check `$line` in $workdir exited ${out.code}")
       CheckResult(
@@ -46,7 +46,8 @@ final class CheckRunner @Inject() (cfg: WorkbenchConfig) extends Logging:
   /** Keep the tail: build noise is at the top, the failure is at the bottom. */
   private def tail(s: String): String =
     if s.length <= CheckRunner.MaxOutput then s
-    else s"…(${s.length - CheckRunner.MaxOutput} earlier characters omitted)\n${s.takeRight(CheckRunner.MaxOutput)}"
+    else
+      s"…(${s.length - CheckRunner.MaxOutput} earlier characters omitted)\n${s.takeRight(CheckRunner.MaxOutput)}"
 
 object CheckRunner:
   /** Enough to read a failing test, small enough to keep in a row and push over SSE. */

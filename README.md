@@ -57,6 +57,8 @@ cd ../frontend && npm install && npm run dev           # UI on :5173
 
 Only repositories listed in `WORKBENCH_REPOS` (comma-separated) or `workbench.repos` can be targeted. Agent permissions, turn and budget caps are in `backend/conf/application.conf` under `workbench.claude`. Every run also has a wall-clock cap (`workbench.max-run-duration`, 15 min by default); cancelling, timing out or stopping the server kills the agent and every process it started ([ADR 0004](docs/adr/0004-every-run-ends.md)).
 
+To verify each attempt, set a check command, e.g. `WORKBENCH_CHECK_COMMAND="sbt test"` or `workbench.check.command` in `application.conf`. It runs in the attempt's worktree after the agent succeeds, and its pass/fail and output show on the run ([ADR 0005](docs/adr/0005-checks-per-attempt.md)).
+
 ## How this repo is built
 
 This project is built mostly by agents, steered by me, and the repo is shaped for that:
