@@ -55,7 +55,7 @@ WORKBENCH_REPOS=/abs/path/to/some/repo sbt run         # API on :9000 (evolution
 cd ../frontend && npm install && npm run dev           # UI on :5173
 ```
 
-Only repositories listed in `WORKBENCH_REPOS` (comma-separated) or `workbench.repos` can be targeted. Agent permissions, turn and budget caps are in `backend/conf/application.conf` under `workbench.claude`.
+Only repositories listed in `WORKBENCH_REPOS` (comma-separated) or `workbench.repos` can be targeted. Agent permissions, turn and budget caps are in `backend/conf/application.conf` under `workbench.claude`. Every run also has a wall-clock cap (`workbench.max-run-duration`, 30 min by default); cancelling, timing out or stopping the server kills the agent and every process it started ([ADR 0004](docs/adr/0004-every-run-ends.md)).
 
 ## How this repo is built
 

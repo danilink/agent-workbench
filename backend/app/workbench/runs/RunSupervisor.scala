@@ -2,18 +2,21 @@ package workbench.runs
 
 import java.nio.file.{Path, Paths}
 import java.time.Instant
-import java.util.concurrent.Semaphore
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
+import java.util.concurrent.{Semaphore, TimeUnit, TimeoutException}
 import javax.inject.{Inject, Singleton}
 
+import scala.annotation.tailrec
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future}
+import scala.concurrent.duration.*
+import scala.concurrent.{Await, Future, Promise}
+import scala.util.Try
 import scala.util.control.NonFatal
 
 import play.api.Logging
+import play.api.inject.ApplicationLifecycle
 
-import workbench.agent.{AgentEvent, AgentRunner, RunHandle, RunSpec}
+import workbench.agent.{AgentEvent, AgentRunner, RunHandle, RunOutcome, RunSpec}
 import workbench.config.{AgentRunsExecutionContext, WorkbenchConfig}
 import workbench.domain.*
 import workbench.events.{BusMessage, EventBus}
@@ -25,6 +28,9 @@ import workbench.store.WorkbenchRepo
   * Concurrency is bounded by a semaphore of `max-parallel-runs`; a run waiting for a slot is visibly
   * `Queued`. Each run is driven by exactly one thread, which is the only writer of its row and its event
   * sequence.
+  *
+  * Every run ends: `max-run-duration` cancels a run that outlives it, and stopping the server (including a
+  * dev-mode reload) cancels all live runs and waits for their processes to die. See docs/adr/0004.
   */
 @Singleton
 final class RunSupervisor @Inject() (
@@ -33,14 +39,33 @@ final class RunSupervisor @Inject() (
     git: GitWorktrees,
     runner: AgentRunner,
     bus: EventBus,
-    ec: AgentRunsExecutionContext
+    ec: AgentRunsExecutionContext,
+    lifecycle: ApplicationLifecycle
 ) extends Logging:
+  import RunSupervisor.Watched
 
   private given AgentRunsExecutionContext = ec
 
   private val slots = Semaphore(cfg.maxParallelRuns, true)
   private val live = TrieMap.empty[RunId, RunHandle]
   private val cancels = TrieMap.empty[RunId, Unit]
+  private val stopping = AtomicBoolean(false)
+  // Completed when a run's thread is done with it, however it ended. The stop hook waits on these.
+  private val inFlight = TrieMap.empty[RunId, Promise[Unit]]
+
+  // How long to wait for a cancelled run to wind down: SIGINT grace, then force-kill, plus margin.
+  private val windDown = cfg.cancelGrace + 5.seconds
+
+  lifecycle.addStopHook { () =>
+    stopping.set(true)
+    val pending = inFlight.values.map(_.future).toList
+    if pending.nonEmpty then
+      logger.warn(
+        s"server stopping: cancelling ${live.size} live run(s), waiting for ${pending.size} in flight"
+      )
+    live.values.foreach(_.cancel())
+    Future(Try(Await.ready(Future.sequence(pending), windDown))).map(_ => ())
+  }
 
   locally {
     val n = repo.failOrphanedRuns(Instant.now())
@@ -70,6 +95,7 @@ final class RunSupervisor @Inject() (
       )
     }
     runs.foreach(repo.insertRun)
+    runs.foreach(r => inFlight.put(r.id, Promise()))
     runs.foreach(r => Future(execute(task, r)))
     runs
 
@@ -100,17 +126,19 @@ final class RunSupervisor @Inject() (
   // --- execution (runs on the agent-runs dispatcher) --------------------------
 
   private def execute(task: Task, initial: Run): Unit =
-    slots.acquire()
     var run = initial
     try
-      if cancels.contains(run.id) then
-        run = save(run.copy(status = RunStatus.Cancelled, finishedAt = Some(Instant.now())))
+      if !awaitSlot(run.id) then
+        // Cancelled while queued. If the server is stopping instead, leave it Queued: the next boot fails it.
+        if !stopping.get then run = finish(run, RunStatus.Cancelled, None)
       else
-        run = save(run.copy(status = RunStatus.Preparing, startedAt = Some(Instant.now())))
-        val workdir = Paths.get(run.worktreePath)
-        git.create(Paths.get(task.repoPath), workdir, run.branch, task.baseSha) match
-          case Left(err) => run = finish(run, RunStatus.Failed, Some(err))
-          case Right(_)  => run = drive(task, run, workdir)
+        try
+          run = save(run.copy(status = RunStatus.Preparing, startedAt = Some(Instant.now())))
+          val workdir = Paths.get(run.worktreePath)
+          git.create(Paths.get(task.repoPath), workdir, run.branch, task.baseSha) match
+            case Left(err) => run = finish(run, RunStatus.Failed, Some(err))
+            case Right(_)  => run = drive(task, run, workdir)
+        finally slots.release()
     catch
       case NonFatal(e) =>
         logger.error(s"run ${run.id} crashed", e)
@@ -118,28 +146,45 @@ final class RunSupervisor @Inject() (
     finally
       live.remove(run.id)
       cancels.remove(run.id)
-      slots.release()
+      inFlight.remove(run.id).foreach(_.trySuccess(()))
+
+  /** Waits for a slot, but gives up as soon as the run is cancelled or the server stops. False: don't run it.
+    */
+  @tailrec private def awaitSlot(id: RunId): Boolean =
+    def abandoned = stopping.get || cancels.contains(id)
+    if abandoned then false
+    else if slots.tryAcquire(1, TimeUnit.SECONDS) then
+      if abandoned then
+        slots.release()
+        false
+      else true
+    else awaitSlot(id)
 
   private def drive(task: Task, start: Run, workdir: Path): Run =
     val run = save(start.copy(status = RunStatus.Running))
     val seq = AtomicInteger(0)
     val handle = runner.start(RunSpec(run.id, workdir, task.prompt), e => record(run.id, seq, e))
     live.put(run.id, handle)
-    if cancels.contains(run.id) then handle.cancel() // cancel raced with start
+    if cancels.contains(run.id) || stopping.get then handle.cancel() // raced with start
 
-    val outcome = Await.result(handle.outcome, Duration.Inf)
-    val status =
-      if cancels.contains(run.id) then RunStatus.Cancelled
-      else if outcome.isError then RunStatus.Failed
-      else RunStatus.Succeeded
+    val watched = RunSupervisor.awaitWithDeadline(handle, cfg.maxRunDuration, windDown)
+    val (status, error, outcome) = watched match
+      case Watched.TimedOut(o) =>
+        if o.isEmpty then logger.error(s"run ${run.id} still not dead ${windDown} after cancelling it")
+        (RunStatus.Failed, Some(s"timed out after ${cfg.maxRunDuration}"), o)
+      case Watched.Finished(o) if cancels.contains(run.id) => (RunStatus.Cancelled, None, Some(o))
+      case Watched.Finished(o) if o.isError && stopping.get =>
+        (RunStatus.Failed, Some("interrupted by server shutdown"), Some(o))
+      case Watched.Finished(o) if o.isError => (RunStatus.Failed, o.summary, Some(o))
+      case Watched.Finished(o)              => (RunStatus.Succeeded, None, Some(o))
     save(
       run.copy(
         status = status,
-        claudeSessionId = outcome.sessionId,
-        costUsd = outcome.costUsd,
-        numTurns = outcome.numTurns,
-        resultSummary = outcome.summary,
-        error = if status == RunStatus.Failed then outcome.summary else None,
+        claudeSessionId = outcome.flatMap(_.sessionId),
+        costUsd = outcome.flatMap(_.costUsd),
+        numTurns = outcome.flatMap(_.numTurns),
+        resultSummary = outcome.flatMap(_.summary),
+        error = error,
         finishedAt = Some(Instant.now())
       )
     )
@@ -157,3 +202,22 @@ final class RunSupervisor @Inject() (
     repo.updateRun(run)
     bus.publish(BusMessage.RunUpdated(run))
     run
+
+object RunSupervisor:
+
+  enum Watched:
+    case Finished(outcome: RunOutcome)
+
+    /** Outlived its deadline and was cancelled. `outcome` is what it reported while winding down, if it did.
+      */
+    case TimedOut(outcome: Option[RunOutcome])
+
+  /** Blocks until the run ends, cancelling it once `deadline` passes. Always returns within deadline +
+    * windDown.
+    */
+  def awaitWithDeadline(handle: RunHandle, deadline: FiniteDuration, windDown: FiniteDuration): Watched =
+    try Watched.Finished(Await.result(handle.outcome, deadline))
+    catch
+      case _: TimeoutException =>
+        handle.cancel()
+        Watched.TimedOut(Try(Await.result(handle.outcome, windDown)).toOption)
