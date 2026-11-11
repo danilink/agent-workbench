@@ -36,6 +36,7 @@ export function RunPanel({ run }: { run: Run }) {
         <TabList>
           <Tab>Timeline ({events.data?.length ?? 0})</Tab>
           <Tab isDisabled={!diffAvailable}>Diff</Tab>
+          <Tab isDisabled={!run.checkStatus}>Check</Tab>
         </TabList>
         <TabPanels>
           <TabPanel px={0}>
@@ -53,6 +54,25 @@ export function RunPanel({ run }: { run: Run }) {
                 </Button>
                 <DiffView diff={diff.data} />
               </>
+            )}
+          </TabPanel>
+          <TabPanel px={0}>
+            {run.checkStatus === 'Running' ? (
+              <Text fontSize="sm">Running check…</Text>
+            ) : (
+              <Box
+                as="pre"
+                fontSize="xs"
+                fontFamily="mono"
+                maxH="400px"
+                overflow="auto"
+                whiteSpace="pre-wrap"
+                p={2}
+                borderWidth="1px"
+                borderRadius="md"
+              >
+                {run.checkOutput ?? 'No check output.'}
+              </Box>
             )}
           </TabPanel>
         </TabPanels>

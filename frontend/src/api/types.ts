@@ -3,6 +3,7 @@
 
 export type RunStatus = 'Queued' | 'Preparing' | 'Running' | 'Succeeded' | 'Failed' | 'Cancelled'
 export type ReviewState = 'Pending' | 'Accepted' | 'Discarded'
+export type CheckStatus = 'Running' | 'Passed' | 'Failed'
 export type EventKind = 'Init' | 'Text' | 'ToolUse' | 'ToolResult' | 'Result' | 'Log' | 'Unknown'
 
 export const TERMINAL: ReadonlySet<RunStatus> = new Set(['Succeeded', 'Failed', 'Cancelled'])
@@ -28,6 +29,9 @@ export interface Run {
   numTurns?: number
   resultSummary?: string
   error?: string
+  // Absent unless a check ran: none configured, or the attempt did not succeed.
+  checkStatus?: CheckStatus
+  checkOutput?: string
   review: ReviewState
   createdAt: string
   startedAt?: string

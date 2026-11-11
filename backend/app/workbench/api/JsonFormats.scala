@@ -16,6 +16,7 @@ object JsonFormats:
   given Writes[RunId] = Writes(id => JsString(id.value.toString))
   given Writes[RunStatus] = Writes(s => JsString(s.toString))
   given Writes[ReviewState] = Writes(s => JsString(s.toString))
+  given Writes[CheckStatus] = Writes(s => JsString(s.toString))
   given Writes[EventKind] = Writes(k => JsString(k.toString))
 
   given Writes[Task] = Json.writes[Task]

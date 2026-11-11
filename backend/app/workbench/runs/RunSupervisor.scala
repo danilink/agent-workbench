@@ -38,6 +38,7 @@ final class RunSupervisor @Inject() (
     repo: WorkbenchRepo,
     git: GitWorktrees,
     runner: AgentRunner,
+    checks: CheckRunner,
     bus: EventBus,
     ec: AgentRunsExecutionContext,
     lifecycle: ApplicationLifecycle
@@ -88,6 +89,8 @@ final class RunSupervisor @Inject() (
         numTurns = None,
         resultSummary = None,
         error = None,
+        checkStatus = None,
+        checkOutput = None,
         review = ReviewState.Pending,
         createdAt = Instant.now(),
         startedAt = None,
@@ -187,7 +190,7 @@ final class RunSupervisor @Inject() (
         (RunStatus.Failed, Some("interrupted by server shutdown"), Some(o))
       case Watched.Finished(o) if o.isError => (RunStatus.Failed, o.summary, Some(o))
       case Watched.Finished(o)              => (RunStatus.Succeeded, None, Some(o))
-    save(
+    val ended = save(
       run.copy(
         status = status,
         claudeSessionId = outcome.flatMap(_.sessionId),
@@ -198,6 +201,20 @@ final class RunSupervisor @Inject() (
         finishedAt = Some(Instant.now())
       )
     )
+    if status == RunStatus.Succeeded then check(ended, workdir) else ended
+
+  /** Verifies what a successful attempt left in its worktree.
+    *
+    * Runs on the run's own thread and inside its parallelism slot: `sbt test` is as heavy as the agent that
+    * wrote the code, so checks must not outnumber `max-parallel-runs`. The run row is already terminal, so
+    * the UI shows the attempt as finished with its check still in flight.
+    */
+  private def check(run: Run, workdir: Path): Run =
+    if !checks.enabled || stopping.get then run
+    else
+      val started = save(run.copy(checkStatus = Some(CheckStatus.Running)))
+      val result = checks.run(workdir) // bounded by check.timeout, never throws
+      save(started.copy(checkStatus = Some(result.status), checkOutput = Some(result.output)))
 
   private def record(id: RunId, seq: AtomicInteger, e: AgentEvent): Unit =
     val (kind, payload) = AgentEvent.toRecord(e)
