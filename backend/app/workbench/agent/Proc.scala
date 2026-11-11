@@ -30,11 +30,17 @@ object Proc:
   private val drainGrace = 5.seconds
 
   /** Runs `cmd` and returns within roughly `timeout`. On timeout the process and everything it started is
-    * killed, and the result is exit -1.
+    * killed, and the result is exit -1. `onStart` receives the process, so a caller can kill it early.
     */
-  def run(cmd: Seq[String], cwd: Path, timeout: FiniteDuration = 60.seconds): Out =
+  def run(
+      cmd: Seq[String],
+      cwd: Path,
+      timeout: FiniteDuration = 60.seconds,
+      onStart: Process => Unit = _ => ()
+  ): Out =
     val p = new ProcessBuilder(cmd*).directory(cwd.toFile).start()
     p.getOutputStream.close()
+    onStart(p)
     // Drain both streams concurrently, and wait on the process rather than on EOF: reading one stream to EOF first
     // can deadlock on the other's full pipe, and EOF only comes when the process exits, so it would also ignore
     // the timeout.

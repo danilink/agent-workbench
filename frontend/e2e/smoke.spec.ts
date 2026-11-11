@@ -50,6 +50,11 @@ test('dispatch → run → diff → discard, without UI errors', async ({ page }
   await expect(main.getByRole('tab', { name: 'Timeline (7)' })).toBeVisible()
   await expect(main.getByText(/Created NOTES-\w+\.md/).first()).toBeVisible()
 
+  // The configured check (`git status --porcelain`, see playwright.config.ts) runs after the agent succeeds.
+  await expect(main.getByText('Check passed')).toBeVisible({ timeout: 30_000 })
+  await main.getByRole('tab', { name: 'Check' }).click()
+  await expect(main.getByText(/exit 0/)).toBeVisible()
+
   await main.getByRole('tab', { name: 'Diff' }).click()
   await expect(main.getByText(/^\+> smoke \d+$/)).toBeVisible()
 

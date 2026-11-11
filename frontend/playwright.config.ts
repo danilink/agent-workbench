@@ -30,7 +30,8 @@ export default defineConfig({
       command: CI ? 'target/universal/stage/bin/agent-workbench -Dpidfile.path=/dev/null' : 'sbt run',
       cwd: path.join(repoRoot, 'backend'),
       url: 'http://localhost:9000/api/health',
-      env: { WORKBENCH_RUNNER: 'fake', WORKBENCH_REPOS: repoRoot },
+      // A cheap check, so the smoke test also covers the post-run check.
+      env: { WORKBENCH_RUNNER: 'fake', WORKBENCH_REPOS: repoRoot, WORKBENCH_CHECK_COMMAND: 'git status --porcelain' },
       reuseExistingServer: !CI,
       timeout: 300_000,
       stdout: 'pipe',

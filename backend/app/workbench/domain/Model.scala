@@ -24,6 +24,12 @@ enum RunStatus derives CanEqual:
 enum ReviewState derives CanEqual:
   case Pending, Accepted, Discarded
 
+/** Verdict of the post-run check (`workbench.check.command`) in the run's worktree. `None` on a [[Run]] means
+  * no check ran: none is configured, or the attempt did not succeed.
+  */
+enum CheckStatus derives CanEqual:
+  case Running, Passed, Failed
+
 /** One agent session working on a task inside its own git worktree. A task fans out to N runs. */
 final case class Run(
     id: RunId,
@@ -37,6 +43,8 @@ final case class Run(
     numTurns: Option[Int],
     resultSummary: Option[String],
     error: Option[String],
+    checkStatus: Option[CheckStatus],
+    checkOutput: Option[String],
     review: ReviewState,
     createdAt: Instant,
     startedAt: Option[Instant],

@@ -16,7 +16,7 @@ import scala.util.control.NonFatal
 import play.api.Logging
 import play.api.inject.ApplicationLifecycle
 
-import workbench.agent.{AgentEvent, AgentRunner, RunHandle, RunOutcome, RunSpec}
+import workbench.agent.{AgentEvent, AgentRunner, Proc, RunHandle, RunOutcome, RunSpec}
 import workbench.config.{AgentRunsExecutionContext, WorkbenchConfig}
 import workbench.domain.*
 import workbench.events.{BusMessage, EventBus}
@@ -38,6 +38,7 @@ final class RunSupervisor @Inject() (
     repo: WorkbenchRepo,
     git: GitWorktrees,
     runner: AgentRunner,
+    checks: CheckRunner,
     bus: EventBus,
     ec: AgentRunsExecutionContext,
     lifecycle: ApplicationLifecycle
@@ -48,6 +49,7 @@ final class RunSupervisor @Inject() (
 
   private val slots = Semaphore(cfg.maxParallelRuns, true)
   private val live = TrieMap.empty[RunId, RunHandle]
+  private val liveChecks = TrieMap.empty[RunId, Process]
   private val cancels = TrieMap.empty[RunId, Unit]
   private val stopping = AtomicBoolean(false)
   // Completed when a run's thread is done with it, however it ended. The stop hook waits on these.
@@ -64,6 +66,7 @@ final class RunSupervisor @Inject() (
         s"server stopping: cancelling ${live.size} live run(s), waiting for ${pending.size} in flight"
       )
     live.values.foreach(_.cancel())
+    liveChecks.values.foreach(Proc.killTree(_))
     Future(Try(Await.ready(Future.sequence(pending), windDown))).map(_ => ())
   }
 
@@ -88,6 +91,8 @@ final class RunSupervisor @Inject() (
         numTurns = None,
         resultSummary = None,
         error = None,
+        checkStatus = None,
+        checkOutput = None,
         review = ReviewState.Pending,
         createdAt = Instant.now(),
         startedAt = None,
@@ -119,6 +124,8 @@ final class RunSupervisor @Inject() (
       run <- repo.getRun(id).toRight("run not found")
       _ <- Either.cond(run.status.isTerminal, (), s"run is still ${run.status}")
       _ <- Either.cond(run.review == ReviewState.Pending, (), s"run was already ${run.review}")
+      // The check is running inside the worktree that accepting or discarding would remove.
+      _ <- Either.cond(!run.checkStatus.contains(CheckStatus.Running), (), "check is still running")
       task <- repo.getTask(run.taskId).toRight("task not found")
       worktree = Paths.get(run.worktreePath)
       _ <-
@@ -187,7 +194,7 @@ final class RunSupervisor @Inject() (
         (RunStatus.Failed, Some("interrupted by server shutdown"), Some(o))
       case Watched.Finished(o) if o.isError => (RunStatus.Failed, o.summary, Some(o))
       case Watched.Finished(o)              => (RunStatus.Succeeded, None, Some(o))
-    save(
+    val ended = save(
       run.copy(
         status = status,
         claudeSessionId = outcome.flatMap(_.sessionId),
@@ -198,6 +205,25 @@ final class RunSupervisor @Inject() (
         finishedAt = Some(Instant.now())
       )
     )
+    if status == RunStatus.Succeeded then check(ended, workdir) else ended
+
+  /** Verifies what a successful attempt left in its worktree.
+    *
+    * Runs on the run's own thread and inside its parallelism slot: `sbt test` is as heavy as the agent that
+    * wrote the code, so checks must not outnumber `max-parallel-runs`. The run row is already terminal, so
+    * the UI shows the attempt as finished with its check still in flight.
+    */
+  private def check(run: Run, workdir: Path): Run =
+    if !checks.enabled || stopping.get then run
+    else
+      val started = save(run.copy(checkStatus = Some(CheckStatus.Running)))
+      // Bounded by check.timeout, never throws; registered so that stopping the server kills it too.
+      val result =
+        try checks.run(workdir, p => liveChecks.put(run.id, p): Unit)
+        finally liveChecks.remove(run.id)
+      val output =
+        if stopping.get then s"interrupted by server shutdown\n\n${result.output}" else result.output
+      save(started.copy(checkStatus = Some(result.status), checkOutput = Some(output)))
 
   private def record(id: RunId, seq: AtomicInteger, e: AgentEvent): Unit =
     val (kind, payload) = AgentEvent.toRecord(e)

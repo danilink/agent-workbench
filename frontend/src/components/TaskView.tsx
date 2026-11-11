@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api, keys } from '../api/client'
 import type { Run } from '../api/types'
 import { RunPanel } from './RunPanel'
-import { ReviewBadge, StatusBadge } from './StatusBadge'
+import { CheckBadge, ReviewBadge, StatusBadge } from './StatusBadge'
 
 export function TaskView({ taskId }: { taskId: string }) {
   const detail = useQuery({ queryKey: keys.task(taskId), queryFn: () => api.task(taskId) })
@@ -53,9 +53,10 @@ function RunCard({ run, active, onClick }: { run: Run; active: boolean; onClick:
     >
       <HStack justify="space-between">
         <Text fontWeight="semibold">Attempt {run.variant}</Text>
-        <HStack spacing={1}>
+        <HStack spacing={1} flexWrap="wrap" justify="end">
           <ReviewBadge review={run.review} />
           <StatusBadge status={run.status} />
+          {run.checkStatus && <CheckBadge status={run.checkStatus} />}
         </HStack>
       </HStack>
       <Text fontSize="xs" fontFamily="mono" color="gray.500" mt={1}>

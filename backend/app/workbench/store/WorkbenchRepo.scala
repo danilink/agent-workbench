@@ -72,7 +72,8 @@ final class WorkbenchRepo @Inject() (db: Database):
     update(
       c,
       """UPDATE runs SET status = ?, claude_session_id = ?, cost_usd = ?, num_turns = ?, result_summary = ?,
-        |error = ?, review = ?, started_at = ?, finished_at = ? WHERE id = ?""".stripMargin
+        |error = ?, check_status = ?, check_output = ?, review = ?, started_at = ?, finished_at = ?
+        |WHERE id = ?""".stripMargin
     ) { ps =>
       ps.setString(1, r.status.toString)
       setOpt(ps, 2, r.claudeSessionId, Types.VARCHAR)(ps.setString)
@@ -80,10 +81,12 @@ final class WorkbenchRepo @Inject() (db: Database):
       setOpt(ps, 4, r.numTurns, Types.INTEGER)(ps.setInt)
       setOpt(ps, 5, r.resultSummary, Types.VARCHAR)(ps.setString)
       setOpt(ps, 6, r.error, Types.VARCHAR)(ps.setString)
-      ps.setString(7, r.review.toString)
-      setOpt(ps, 8, r.startedAt.map(Timestamp.from), Types.TIMESTAMP_WITH_TIMEZONE)(ps.setTimestamp)
-      setOpt(ps, 9, r.finishedAt.map(Timestamp.from), Types.TIMESTAMP_WITH_TIMEZONE)(ps.setTimestamp)
-      ps.setObject(10, r.id.value)
+      setOpt(ps, 7, r.checkStatus.map(_.toString), Types.VARCHAR)(ps.setString)
+      setOpt(ps, 8, r.checkOutput, Types.VARCHAR)(ps.setString)
+      ps.setString(9, r.review.toString)
+      setOpt(ps, 10, r.startedAt.map(Timestamp.from), Types.TIMESTAMP_WITH_TIMEZONE)(ps.setTimestamp)
+      setOpt(ps, 11, r.finishedAt.map(Timestamp.from), Types.TIMESTAMP_WITH_TIMEZONE)(ps.setTimestamp)
+      ps.setObject(12, r.id.value)
     }
   }
 
@@ -95,13 +98,22 @@ final class WorkbenchRepo @Inject() (db: Database):
     query(c, "SELECT * FROM runs WHERE task_id = ? ORDER BY variant")(_.setObject(1, id.value))(run)
   }
 
-  /** Runs left non-terminal by a previous process (crash, redeploy) can never finish: fail them on boot. */
+  /** Runs left non-terminal by a previous process (crash, redeploy) can never finish: fail them on boot. A
+    * check in flight is orphaned the same way, but its run row is already terminal by then, so it needs its
+    * own update or the UI would show it spinning forever.
+    */
   def failOrphanedRuns(now: Instant): Int = db.withConnection { c =>
-    update(
+    val runs = update(
       c,
       """UPDATE runs SET status = 'Failed', error = 'interrupted by server restart', finished_at = ?
         |WHERE status IN ('Queued', 'Preparing', 'Running')""".stripMargin
     )(_.setTimestamp(1, Timestamp.from(now)))
+    val checks = update(
+      c,
+      """UPDATE runs SET check_status = 'Failed', check_output = 'interrupted by server restart'
+        |WHERE check_status = 'Running'""".stripMargin
+    )(_ => ())
+    runs + checks
   }
 
   // --- events -----------------------------------------------------------------
@@ -146,6 +158,8 @@ final class WorkbenchRepo @Inject() (db: Database):
     numTurns = optInt(rs, "num_turns"),
     resultSummary = Option(rs.getString("result_summary")),
     error = Option(rs.getString("error")),
+    checkStatus = Option(rs.getString("check_status")).map(CheckStatus.valueOf),
+    checkOutput = Option(rs.getString("check_output")),
     review = ReviewState.valueOf(rs.getString("review")),
     createdAt = rs.getTimestamp("created_at").toInstant,
     startedAt = Option(rs.getTimestamp("started_at")).map(_.toInstant),

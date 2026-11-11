@@ -15,6 +15,10 @@ final case class ClaudeConfig(
     extraArgs: Seq[String]
 )
 
+/** Verification command run in a run's worktree after the agent succeeds. Argv, not a shell line. */
+final case class CheckConfig(command: Seq[String], timeout: FiniteDuration):
+  def enabled: Boolean = command.nonEmpty
+
 final case class WorkbenchConfig(
     repos: Seq[Path],
     worktreeRoot: Path,
@@ -22,7 +26,8 @@ final case class WorkbenchConfig(
     maxRunDuration: FiniteDuration,
     cancelGrace: FiniteDuration,
     runner: String,
-    claude: ClaudeConfig
+    claude: ClaudeConfig,
+    check: CheckConfig
 ):
   /** Only explicitly allow-listed repositories can be handed to an agent. */
   def allowedRepo(raw: String): Option[Path] =
@@ -48,5 +53,12 @@ object WorkbenchConfig:
         maxTurns = c.get[Int]("workbench.claude.max-turns"),
         maxBudgetUsd = c.get[Double]("workbench.claude.max-budget-usd"),
         extraArgs = c.get[Seq[String]]("workbench.claude.extra-args")
+      ),
+      check = CheckConfig(
+        // The env var is a command line ("sbt test"); the config key is already argv.
+        command = sys.env.get("WORKBENCH_CHECK_COMMAND").map(_.trim).filter(_.nonEmpty) match
+          case Some(s) => s.split("\\s+").toSeq
+          case None    => c.get[Seq[String]]("workbench.check.command"),
+        timeout = c.get[FiniteDuration]("workbench.check.timeout")
       )
     )
