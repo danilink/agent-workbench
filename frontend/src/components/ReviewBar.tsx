@@ -31,7 +31,7 @@ export function ReviewBar({ runId }: { runId: string }) {
     return (
       <HStack spacing={2}>
         <Text fontSize="xs">
-          {decision === 'accept' ? 'Keep the branch and remove the worktree?' : 'Delete the branch and worktree?'}
+          {decision === 'accept' ? 'Commit the changes to the branch and remove the worktree?' : 'Delete the branch, the worktree and every change in it?'}
         </Text>
         <Button size="xs" colorScheme={decision === 'accept' ? 'green' : 'red'} onClick={() => send({ type: 'CONFIRM' })}>
           Yes

@@ -28,7 +28,7 @@ flowchart LR
   BUS --> API
 ```
 
-A **task** is a prompt against an allow-listed repo at a pinned commit. It fans out into N **runs**. A run goes `Queued → Preparing → Running → Succeeded | Failed | Cancelled`, then gets reviewed: **Accept** keeps the branch and frees the worktree, **Discard** deletes both.
+A **task** is a prompt against an allow-listed repo at a pinned commit. It fans out into N **runs**. A run goes `Queued → Preparing → Running → Succeeded | Failed | Cancelled`, then gets reviewed: **Accept** commits whatever the agent left uncommitted onto the run's branch, keeps the branch and frees the worktree; **Discard** deletes both.
 
 | Path | What lives there |
 | --- | --- |
@@ -55,7 +55,7 @@ WORKBENCH_REPOS=/abs/path/to/some/repo sbt run         # API on :9000 (evolution
 cd ../frontend && npm install && npm run dev           # UI on :5173
 ```
 
-Only repositories listed in `WORKBENCH_REPOS` (comma-separated) or `workbench.repos` can be targeted. Agent permissions, turn and budget caps are in `backend/conf/application.conf` under `workbench.claude`. Every run also has a wall-clock cap (`workbench.max-run-duration`, 30 min by default); cancelling, timing out or stopping the server kills the agent and every process it started ([ADR 0004](docs/adr/0004-every-run-ends.md)).
+Only repositories listed in `WORKBENCH_REPOS` (comma-separated) or `workbench.repos` can be targeted. Agent permissions, turn and budget caps are in `backend/conf/application.conf` under `workbench.claude`. Every run also has a wall-clock cap (`workbench.max-run-duration`, 15 min by default); cancelling, timing out or stopping the server kills the agent and every process it started ([ADR 0004](docs/adr/0004-every-run-ends.md)).
 
 ## How this repo is built
 
