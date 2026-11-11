@@ -15,7 +15,11 @@ test('dispatch → run → diff → discard, without UI errors', async ({ page }
 
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Agent Workbench' })).toBeVisible()
-  await expect(page.getByText('fake', { exact: true })).toBeVisible()
+  // Guard: against a backend running the real runner this test would start a real, paid agent session.
+  await expect(
+    page.getByText('fake', { exact: true }),
+    'backend must run with WORKBENCH_RUNNER=fake (stop the real one, or let Playwright start its own)',
+  ).toBeVisible()
 
   const prompt = `smoke ${Date.now()}`
   await page.getByPlaceholder(/GET \/api\/version/).fill(prompt)

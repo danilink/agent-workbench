@@ -79,7 +79,7 @@ jobs:
         working-directory: frontend
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          google-chrome --version
       - name: Smoke test
         working-directory: frontend
         run: npm run e2e
