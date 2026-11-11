@@ -25,6 +25,24 @@ final class GitWorktrees:
       d <- git(worktree, "diff", "--no-color", "--no-ext-diff", baseSha)
     yield d
 
+  /** Commits everything left in the worktree (agents rarely commit) onto its branch, so removing the checkout
+    * cannot lose work. Returns false when there was nothing to commit.
+    */
+  def commitAll(worktree: Path, message: String): Either[String, Boolean] =
+    for
+      _ <- git(worktree, "add", "--all")
+      status <- git(worktree, "status", "--porcelain")
+      committed <-
+        if status.trim.isEmpty then Right(false)
+        else git(worktree, identity(worktree) ++ Seq("commit", "--no-verify", "-m", message)*).map(_ => true)
+    yield committed
+
+  // Use the user's git identity; fall back to a neutral one where none is configured (CI, fresh machines),
+  // since `git commit` refuses to run without one.
+  private def identity(worktree: Path): Seq[String] =
+    if git(worktree, "config", "user.email").exists(_.trim.nonEmpty) then Nil
+    else Seq("-c", "user.name=Agent Workbench", "-c", "user.email=agent-workbench@localhost")
+
   /** Removes the checkout. The branch is kept unless `deleteBranch`, so accepted work can be merged later. */
   def remove(repo: Path, worktree: Path, branch: String, deleteBranch: Boolean): Either[String, Unit] =
     val removed =

@@ -13,7 +13,7 @@ A run is a `claude -p` process plus whatever it starts (sbt, npm, shells). Befor
 
 ## Decision
 
-- **Wall-clock deadline per run**: `workbench.max-run-duration` (default 30 minutes). When it passes, the run is cancelled like a user cancel and ends `Failed: timed out after …`. The wait for its outcome is bounded too (`cancel-grace` + 5s), so the slot is released even if the process cannot be reaped.
+- **Wall-clock deadline per run**: `workbench.max-run-duration` (default 15 minutes; it was 30 when this ADR was written). When it passes, the run is cancelled like a user cancel and ends `Failed: timed out after …`. The wait for its outcome is bounded too (`cancel-grace` + 5s), so the slot is released even if the process cannot be reaped.
 - **Cancel = SIGINT, then kill the whole tree**: after `workbench.cancel-grace` (default 10s), `claude` and every descendant are force-killed. Descendants are snapshotted when the cancel starts, because once `claude` exits its children are reparented and unreachable from its handle.
 - **Stop hook**: on application stop (including dev-mode reloads) the supervisor stops admitting runs, cancels all live ones and waits for them, within Pekko's `service-stop` phase, raised to 30s. Interrupted runs end `Failed: interrupted by server shutdown`. Runs still queued stay `Queued`; the next boot fails them, as before.
 - **Queued runs poll for a slot** (`tryAcquire` every second) instead of blocking, so cancel and shutdown reach them immediately.

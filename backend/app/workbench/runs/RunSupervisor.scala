@@ -1,6 +1,6 @@
 package workbench.runs
 
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Files, Path, Paths}
 import java.time.Instant
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import java.util.concurrent.{Semaphore, TimeUnit, TimeoutException}
@@ -120,8 +120,18 @@ final class RunSupervisor @Inject() (
       _ <- Either.cond(run.status.isTerminal, (), s"run is still ${run.status}")
       _ <- Either.cond(run.review == ReviewState.Pending, (), s"run was already ${run.review}")
       task <- repo.getTask(run.taskId).toRight("task not found")
-      _ <- git.remove(Paths.get(task.repoPath), Paths.get(run.worktreePath), run.branch, deleteBranch)
+      worktree = Paths.get(run.worktreePath)
+      _ <-
+        if to == ReviewState.Accepted && Files.exists(worktree) then
+          git.commitAll(worktree, commitMessage(task, run))
+        else Right(false)
+      _ <- git.remove(Paths.get(task.repoPath), worktree, run.branch, deleteBranch)
     yield save(run.copy(review = to))
+
+  private def commitMessage(task: Task, run: Run): String =
+    val firstLine = task.prompt.linesIterator.nextOption().getOrElse("").trim
+    val subject = if firstLine.length <= 72 then firstLine else firstLine.take(71) + "…"
+    s"$subject\n\nAccepted from Agent Workbench run ${run.id} (attempt ${run.variant}, task ${task.id}).\n"
 
   // --- execution (runs on the agent-runs dispatcher) --------------------------
 

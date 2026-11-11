@@ -10,7 +10,7 @@ Several agent sessions must edit the same repository at the same time, and each 
 
 Every run gets `git worktree add -b wb/<task>-v<n> <root>/<runId> <baseSha>`. The task pins `baseSha` when it is created, so all attempts start from the same commit even if the branch moves. The diff shown in the UI is `git diff <baseSha>` inside the worktree after `git add --intent-to-add --all`, which covers commits, staged, unstaged and new files.
 
-Accept removes the worktree and keeps the branch. Discard removes both.
+Accept commits anything left uncommitted in the worktree onto the run's branch (agents rarely commit), then removes the worktree and keeps the branch. Discard removes both.
 
 ## Consequences
 

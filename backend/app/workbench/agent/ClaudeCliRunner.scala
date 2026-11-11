@@ -9,7 +9,6 @@ import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future, Promise}
-import scala.jdk.CollectionConverters.*
 import scala.util.Try
 import scala.util.control.NonFatal
 
@@ -91,7 +90,7 @@ final class ClaudeCliRunner @Inject() (cfg: WorkbenchConfig, ec: AgentRunsExecut
         outcome.success(result)
       catch
         case NonFatal(e) =>
-          killTree(process)
+          Proc.killTree(process)
           outcome.failure(e)
     }
 
@@ -113,18 +112,11 @@ final class ClaudeCliRunner @Inject() (cfg: WorkbenchConfig, ec: AgentRunsExecut
     */
   private def interrupt(p: Process): Unit =
     // Snapshot now: once `claude` exits, its children are reparented and no longer reachable from `p`.
-    val tree = descendants(p)
+    val tree = Proc.descendants(p)
     val pid = p.pid().toString
     Proc.run(Seq("kill", "-INT", pid), Paths.get("."), 5.seconds)
     onOwnThread {
       if !p.waitFor(cfg.cancelGrace.toMillis, TimeUnit.MILLISECONDS) then
         logger.warn(s"pid $pid ignored SIGINT for ${cfg.cancelGrace}, killing it and its children")
-      killTree(p, tree)
+      Proc.killTree(p, tree)
     }
-
-  private def descendants(p: Process): List[ProcessHandle] = p.descendants().iterator().asScala.toList
-
-  private def killTree(p: Process, known: List[ProcessHandle] = Nil): Unit =
-    (known ++ descendants(p)).distinct.filter(_.isAlive).foreach(_.destroyForcibly())
-    if p.isAlive then p.destroyForcibly()
-    ()
